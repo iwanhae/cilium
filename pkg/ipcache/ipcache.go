@@ -526,7 +526,14 @@ func (ipc *IPCache) UpsertMetadataBatch(updates ...MU) (revision uint64) {
 	prefixes := make([]cmtypes.PrefixCluster, 0, len(updates))
 	ipc.metadata.Lock()
 	for _, upd := range updates {
-		if !upd.IsCIDR || ipc.metadata.prefixRefCounter.Add(upd.Prefix) {
+		// The metadata store keys entries by their canonical (masked,
+		// unmapped) prefix, so the CIDR reference counter must use the same
+		// canonical key. Otherwise two policies referencing the same network
+		// via different host-bit representations (e.g. 10.0.0.1/24 and
+		// 10.0.0.0/24) would be counted under distinct keys while sharing a
+		// single consolidated metadata entry, and removing one would release
+		// the shared identity still needed by the other.
+		if !upd.IsCIDR || ipc.metadata.prefixRefCounter.Add(canonicalPrefix(upd.Prefix)) {
 			resource := upd.Resource
 			if upd.IsCIDR {
 				resource = cidrResourceID
@@ -561,7 +568,10 @@ func (ipc *IPCache) RemoveMetadataBatch(updates ...MU) (revision uint64) {
 	prefixes := make([]cmtypes.PrefixCluster, 0, len(updates))
 	ipc.metadata.Lock()
 	for _, upd := range updates {
-		if !upd.IsCIDR || ipc.metadata.prefixRefCounter.Delete(upd.Prefix) {
+		// Use the canonical prefix as the reference counter key so that it
+		// stays consistent with UpsertMetadataBatch and with the metadata
+		// store keying. See the comment in UpsertMetadataBatch for details.
+		if !upd.IsCIDR || ipc.metadata.prefixRefCounter.Delete(canonicalPrefix(upd.Prefix)) {
 			resource := upd.Resource
 			if upd.IsCIDR {
 				resource = cidrResourceID
