@@ -1520,13 +1520,9 @@ func TestIPCacheCIDRResourceConsolidation(t *testing.T) {
 	assert.Nil(t, s.IPIdentityCache.metadata.get(cidr))
 }
 
-// TestIPCacheCIDRResourceConsolidationNonCanonical is a regression test for a
-// cross-namespace bug where the CIDR reference counter was keyed by the raw
-// (non-canonical) prefix, while the consolidated metadata entry is keyed by the
-// canonical (masked) prefix. Two policies in different namespaces referencing
-// the same network via different host-bit representations (10.0.0.1/24 and
-// 10.0.0.0/24) share a single metadata entry, so deleting one must not release
-// the identity still needed by the other.
+// TestIPCacheCIDRResourceConsolidationNonCanonical is a test for CIDR reference
+// counting with non-canonical prefixes. Ensures deleting a policy for 10.0.0.1/24
+// does not release the shared canonical identity for 10.0.0.0/24.
 func TestIPCacheCIDRResourceConsolidationNonCanonical(t *testing.T) {
 	s := setupIPCacheTestSuite(t)
 
